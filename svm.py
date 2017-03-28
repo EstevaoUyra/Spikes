@@ -18,40 +18,55 @@ def binShuffle(data):
 def trialShuffle(data):
     return data
 
+class DataHandler():
+    def __init__(self, trialsToUse, trainSize):
+        self.trialsToUse = trialsToUse
+        self.trainSize = trainSize
+
+    def getTrainIndexes(self,testTrial):
+        nonTestTrials = self.trialsToUse[:]
+        nonTestTrials.remove(testTrial)
+        trainIndexes = np.random.choice(nonTestTrials, self.trainSize, replace=False)
+        return trainIndexes
+
+    def getTrialsData(self,trialIndexes):
+        try: X = iris.data[trialIndexes]
+        except: X = iris.data[trialIndexes]
+
+        y = iris.target[trialIndexes]
+        return X, y
+
 
 class Animal():
-    def __init__(self, animalData, trainSize, Nclf_ForEachTrial):
-        self.trialsToUse = range(150)
-        self.classifiers = {itrial:[] for itrial in self.trialsToUse}
-        self.predictions = {itrial:[] for itrial in self.trialsToUse}
-        self.trainSize = trainSize
+    def __init__(self, animalData, Nclf_ForEachTrial):
+        self.classifiers = {itrial:[] for itrial in animalData.trialsToUse}
+        self.predictions = {itrial:[] for itrial in animalData.trialsToUse}
         self.bestClassifier = None
         self.Nclf_ForEachTrial = Nclf_ForEachTrial
         self.Data = animalData
 
     def __generateClassifier(self,testTrial):
-        trainIndexes = self.__getTrainIndexes(testTrial)
+        trainIndexes = self.Data.getTrainIndexes(testTrial)
         clf = self.__trainOneClassifier(trainIndexes)
-
         self.__addClassifierToAll(trainIndexes, clf)
 
     def __addClassifierToAll(self,trainIndexes, clf):
-        possibleTestTrials = list( set(self.trialsToUse)-set(trainIndexes) )
-        for iTestTrial in possibleTestTrials:
-            if len(self.classifiers[iTestTrial]) < self.Nclf_ForEachTrial:
-                self.classifiers[iTestTrial].append(clf)
+        possibleTestTrials = list( set(self.Data.trialsToUse)-set(trainIndexes) )
+        for eachTrial in possibleTestTrials:
+            if len(self.classifiers[eachTrial]) < self.Nclf_ForEachTrial:
+                self.classifiers[eachTrial].append(clf)
 
     def __trainOneClassifier(self,trainIndexes):
         if self.bestClassifier is None:
             self.__gridSearch()
         clf = clone(self.bestClassifier)
-        X, y = self.__getTrialsData(trainIndexes)
+        X, y = self.Data.getTrialsData(trainIndexes)
         clf.fit(X,y)
         return clf
 
     def __gridSearch(self):
-        grid_trials = self.trialsToUse
-        X, y = self.__getTrialsData(grid_trials)
+        grid_trials = self.Data.trialsToUse
+        X, y = self.Data.getTrialsData(grid_trials)
         clf = SVC( kernel='rbf' )
         grid = GridSearchCV(clf, self.__gridParams(), cv=5)
         grid.fit(X, y)
@@ -63,30 +78,16 @@ class Animal():
         return {'C':C_grid,'gamma':Gamma_grid}
 
 
-    def __getTrainIndexes(self,testTrial):
-        nonTestTrials = self.trialsToUse[:]
-        nonTestTrials.remove(testTrial)
-        trainIndexes = np.random.choice(nonTestTrials, self.trainSize, replace=False)
-        return trainIndexes
-
-    def __getTrialsData(self,trialIndexes):
-        try: X = iris.data[trialIndexes]
-        except: X = iris.data[trialIndexes]
-
-        y = iris.target[trialIndexes]
-        return X, y
-
     def generateClassifiers(self):
-        for iTestTrial in self.trialsToUse:
+        for iTestTrial in self.Data.trialsToUse:
             print(iTestTrial)
             while len(self.classifiers[iTestTrial]) < self.Nclf_ForEachTrial:
                 self.__generateClassifier(iTestTrial)
 
-
     def predictAllResults(self):
-        for iTestTrial in self.trialsToUse:
+        for iTestTrial in self.Data.trialsToUse:
             for iclf in self.classifiers[iTestTrial]:
-                X, y = self.__getTrialsData(iTestTrial)
+                X, y = self.Data.getTrialsData(iTestTrial)
                 self.predictions[iTestTrial].append(iclf.predict(X))
             #self.pearsonTest(iTestTrial)
 
