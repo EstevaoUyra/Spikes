@@ -33,3 +33,23 @@ def mymax(x, tmin = -.5):
         return x.max()
     except:
         return tmin
+
+
+class trialTransform(): #Not being used for long time
+    def __init__(self):
+        pass
+
+    def fit(self,X,y):
+        pass
+
+    def transform(self,X,y = None):
+        return np.transpose(X).reshape(-1,X.shape[0])
+
+    def fit_transform(self,X,y=None):
+        return self.transform(X,y)
+
+    def get_params(self,deep=True):
+        return {}
+
+    def set_params(self):
+        return self

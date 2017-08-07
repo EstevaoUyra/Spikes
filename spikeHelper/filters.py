@@ -1,12 +1,17 @@
 import scipy.stats as st
 import numpy as np
 
-def convHist(spikeVec, returnSmoothed = False, bins = 30):
-    normKernel = st.norm(0,100).pdf(np.linspace(-300,300,600))
+def convHist(spikeVec, sigma=100, bins = 30, window = (0,1500)):
+    smoothed = kernelSmooth(spikeVec, sigma)
+    binned = binarize(smoothed, bins, window)
+    return binned
+
+def kernelSmooth(spikeVec, sigma = 100):
+    normKernel = st.norm(0,sigma).pdf(np.linspace(-3*sigma,3*sigma,6*sigma))
     smoothed = np.convolve(spikeVec, normKernel, 'same')
-    times = np.arange(1500)
-    binned = np.histogram(times,bins, range=[0,1500], weights = smoothed[times])[0]
-    if returnSmoothed:
-        return binned, smoothed
-    else:
-        return binned
+    return smoothed
+
+def binarize(smoothed, bins=30, window = (0,1500)):
+    times = np.arange(window[0],window[1])
+    binned = np.histogram(times, bins = bins, range = window, weights = smoothed[times])[0]
+    return binned
