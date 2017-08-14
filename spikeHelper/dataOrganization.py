@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 from itertools import product
+from spikeHelper.filters import convHist
 
 def singleRatResults(trials, nSplits = 5, conditions = ['Train late','Train early']):
     split = np.arange(nSplits)
@@ -22,3 +23,15 @@ def trialToXyT(dataset):
 
 def getX(data):
     return data[data.columns[['unit' in coli for coli in data.columns]]].as_matrix()
+
+def trialNumber(trialStrings):
+    return np.array(list(map(lambda x: int(x[5:]),trialStrings)))
+
+def XyTfromEpoch(epochs, binDuration=50, window=[0,1000]):
+    cutEpochs = epochs.applymap(lambda x: x[window[0]:window[1]] )
+    bins = (window[1]-window[0])//binDuration
+    binnedData = cutEpochs.applymap(lambda x: convHist(x, bins=bins) )
+    return np.swapaxes(np.array([np.vstack(binnedData.iloc[i]) for i in range(binnedData.shape[0])]),1,2)
+
+def normRows(k):
+    return np.array([k[i,:]/(k.max(axis=1)[i]) for i in range(k.shape[0])])

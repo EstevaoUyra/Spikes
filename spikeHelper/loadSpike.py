@@ -1,6 +1,8 @@
 import pandas as pd
 from scipy.io import loadmat
 import numpy as np
+from spikeHelper.filters import filterEpochs
+from spikeHelper.dataOrganization import XyTfromEpoch
 
 def loadSpikeBehav(fileName):
     data = loadmat(fileName)
@@ -20,6 +22,9 @@ def loadSpikeBehav(fileName):
 
     for itrial in range(1,behavior.shape[0]+1):
         epochs['trial '+str(itrial)] = epochs['trial '+str(itrial)].apply(lambda x: serializeSpikes(x, int(1000*behavior.duration[itrial-1])))
+        
+    # Make sure number of spikes is still the same
+    assert all(spikes['times'].apply(len).values == epochs.applymap(sum).sum(axis=1).values)
 
     return spikes, behavior, epochs
 

@@ -2,38 +2,35 @@ from sklearn.model_selection import GridSearchCV, StratifiedShuffleSplit
 from sklearn.svm import SVC
 import pandas as pd
 import numpy as np
-from spikeHelper.dataOrganization import getX, trialToXyT
+from spikeHelper.visuals import trialNeuronPlot, firingRateEvo
+from spikeHelper.loadSpike import loadSpikeBehav
+from spikeHelper.dataOrganization import trialToXyT, getX
+from spikeHelper.filters import convHist, filterEpochs
 from sklearn.metrics import cohen_kappa_score
 import scipy.stats as st
 from sklearn.base import clone
 from scipy.io import loadmat
+import pickle
 
 def expAllRats():
     results = pd.DataFrame(index = ['rat 7','rat 8','rat 9','rat 10'], columns = ['Late corr', 'Late kappa', 'Early corr', 'Early kappa', 'Cross late train corr','Cross late train kappa','Cross early train corr','Cross early train kappa',  'perTrialCorr', 'perTrialKappa','best Params'])
 
-    data = loadmat('bigbin_r7.mat')['C']
-    data = np.nan_to_num(np.swapaxes(data,0,2))
-    data = trialToXyT(data[:20,:20,:])
+    data = trialToXyT(pickle.load(open('Data/50ms_r7_1000msPlus.pickle','rb')))
     rat = 'rat 7'
     results = experiment1rat(data,rat,results)
 
-    data = loadmat('bigbin_r8.mat')['C']
-    data = np.nan_to_num(np.swapaxes(data,0,2))
-    data = trialToXyT(data[:20,:20,:])
+    data = trialToXyT(pickle.load(open('Data/50ms_r8_1000msPlus.pickle','rb')))
     rat = 'rat 8'
     results = experiment1rat(data,rat,results)
 
-#    data = loadmat('normbin_r9.mat')['C']
-#    data = np.nan_to_num(np.swapaxes(data,0,2))
-#    data = trialToXyT(data[:20,:20,:])
-#    rat = 'rat 9'
-#    results = experiment1rat(data,rat,results)
+    data = trialToXyT(pickle.load(open('Data/50ms_r9_1000msPlus.pickle','rb')))
+    rat = 'rat 9'
+    results = experiment1rat(data,rat,results)
 
-    data = loadmat('bigbin_r10.mat')['C']
-    data = np.nan_to_num(np.swapaxes(data,0,2))
-    data = trialToXyT(data[:20,:20,:])
+    data = trialToXyT(pickle.load(open('Data/50ms_r10_1000msPlus.pickle','rb')))
     rat = 'rat 10'
     results = experiment1rat(data,rat,results)
+
     return results
 
 def experiment1rat(data,rat,results,n_splits=[10, 30]):
@@ -45,7 +42,7 @@ def experiment1rat(data,rat,results,n_splits=[10, 30]):
     C_grid = range(10,17); Gamma_grid = np.linspace(.1,.4,10)*1./20;
     params = {'C':C_grid,'gamma':Gamma_grid}
     grid = GridSearchCV(SVC(), params, cv=2)
-    grid.fit(getX(data),data['y'])
+    grid.fit(getX(data[data['end']]),data[data['end']]['y'])
     results['best Params'][rat] = grid.best_params_
 
     print('Direct training')
@@ -73,8 +70,8 @@ def experiment1rat(data,rat,results,n_splits=[10, 30]):
 def expEvolution(clf, data, n_splits = 30):
     predictions = eachCross(clf, data[data['end'] ], data, n_splits)
     evolutionRes = {}
-    evolutionRes['corr'] = [predictions.apply(lambda x: st.pearsonr( x[predictions['trial']==i], predictions['y'][predictions['trial']==i] )[0] ) for i in range(data['trial'].max()-100) ]
-    evolutionRes['kappa'] = [predictions.apply(lambda x: cohen_kappa_score( x[predictions['trial']==i], predictions['y'][predictions['trial']==i] ) ) for i in range(data['trial'].max()-100) ]
+    evolutionRes['corr'] = [predictions.apply(lambda x: st.pearsonr( x[predictions['trial']==i], predictions['y'][predictions['trial']==i] )[0] ) for i in range(data['trial'].max()) ]
+    evolutionRes['kappa'] = [predictions.apply(lambda x: cohen_kappa_score( x[predictions['trial']==i], predictions['y'][predictions['trial']==i] ) ) for i in range(data['trial'].max()) ]
     return (pd.DataFrame(evolutionRes['corr'])).iloc[:,:n_splits], (pd.DataFrame(evolutionRes['kappa'])).iloc[:,:n_splits]
 
 def bothSame(clf, data, n_splits):
@@ -108,7 +105,7 @@ def eachSame(clf, data, n_splits):
             clf.fit(Xi[idx,:],yi.as_matrix()[idx])
             ypred[-1].append(clf.predict(getX(data)[trial==ti,:]))
 
-    return np.array(ypred), data['y'].values.reshape(-1,20)
+    return np.array(ypred), data['y'].values.reshape(-1,np.array(ypred).shape[2])
 
 def bothCross(clf, data, n_splits=30):
     crossResults = {}
