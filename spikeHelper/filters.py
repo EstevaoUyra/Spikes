@@ -30,3 +30,10 @@ def filterEpochs(epochs, minFiringRate= 4, minISI=5,method = 'gabi', rat = None)
         return epochs.iloc[goodNeurons,:]
     else:
         raise('Nao existe metodo '+ str(method))
+
+def oneToOneDist(Us, Vs, distfunc):
+    eachDist = []
+    for ui in Us:
+        for vi in Vs:
+            eachDist.append(distfunc(ui,vi))
+    return np.array(eachDist).mean()

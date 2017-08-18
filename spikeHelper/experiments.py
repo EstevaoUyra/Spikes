@@ -2,32 +2,35 @@ from sklearn.model_selection import GridSearchCV, StratifiedShuffleSplit
 from sklearn.svm import SVC
 import pandas as pd
 import numpy as np
-from spikeHelper.visuals import trialNeuronPlot, firingRateEvo
-from spikeHelper.loadSpike import loadSpikeBehav
-from spikeHelper.dataOrganization import trialToXyT, getX
-from spikeHelper.filters import convHist, filterEpochs
 from sklearn.metrics import cohen_kappa_score
 import scipy.stats as st
 from sklearn.base import clone
 from scipy.io import loadmat
 import pickle
 
+from spikeHelper.visuals import trialNeuronPlot, firingRateEvo
+from spikeHelper.loadSpike import loadSpikeBehav
+from spikeHelper.dataOrganization import trialToXyT, getX
+from spikeHelper.filters import convHist, filterEpochs
+
 def expAllRats():
     results = pd.DataFrame(index = ['rat 7','rat 8','rat 9','rat 10'], columns = ['Late corr', 'Late kappa', 'Early corr', 'Early kappa', 'Cross late train corr','Cross late train kappa','Cross early train corr','Cross early train kappa',  'perTrialCorr', 'perTrialKappa','best Params'])
 
-    data = trialToXyT(pickle.load(open('Data/50ms_r7_1000msPlus.pickle','rb')))
+
+
+    data = trialToXyT(pickle.load(open('Data/50ms_r7_1300msPlus1s.pickle','rb')))
     rat = 'rat 7'
     results = experiment1rat(data,rat,results)
 
-    data = trialToXyT(pickle.load(open('Data/50ms_r8_1000msPlus.pickle','rb')))
+    data = trialToXyT(pickle.load(open('Data/50ms_r8_1300msPlus1s.pickle','rb')))
     rat = 'rat 8'
     results = experiment1rat(data,rat,results)
 
-    data = trialToXyT(pickle.load(open('Data/50ms_r9_1000msPlus.pickle','rb')))
+    data = trialToXyT(pickle.load(open('Data/50ms_r9_1300msPlus1s.pickle','rb')))
     rat = 'rat 9'
     results = experiment1rat(data,rat,results)
 
-    data = trialToXyT(pickle.load(open('Data/50ms_r10_1000msPlus.pickle','rb')))
+    data = trialToXyT(pickle.load(open('Data/50ms_r10_1300msPlus1s.pickle','rb')))
     rat = 'rat 10'
     results = experiment1rat(data,rat,results)
 
@@ -67,7 +70,7 @@ def experiment1rat(data,rat,results,n_splits=[10, 30]):
     results['perTrialKappa'][rat] = kappaEvo
     return results
 
-def expEvolution(clf, data, n_splits = 30):
+def expEvolution(clf, data, n_splits):
     predictions = eachCross(clf, data[data['end'] ], data, n_splits)
     evolutionRes = {}
     evolutionRes['corr'] = [predictions.apply(lambda x: st.pearsonr( x[predictions['trial']==i], predictions['y'][predictions['trial']==i] )[0] ) for i in range(data['trial'].max()) ]
@@ -91,7 +94,7 @@ def bothSame(clf, data, n_splits):
     return results
 
 def eachSame(clf, data, n_splits):
-    sh = StratifiedShuffleSplit(n_splits = n_splits, test_size=None, train_size = .9)
+    sh = StratifiedShuffleSplit(n_splits = n_splits, test_size=None, train_size = .5)
     trial = data['trial']
     ypred = [];
     for ti in np.unique(trial):
@@ -107,7 +110,7 @@ def eachSame(clf, data, n_splits):
 
     return np.array(ypred), data['y'].values.reshape(-1,np.array(ypred).shape[2])
 
-def bothCross(clf, data, n_splits=30):
+def bothCross(clf, data, n_splits):
     crossResults = {}
 
     train = data[data['beg']]; test = data[data['end']];
@@ -124,8 +127,8 @@ def bothCross(clf, data, n_splits=30):
 
     return crossResults
 
-def eachCross(clf, train, test, n_splits=30):
-    sh = StratifiedShuffleSplit(n_splits = n_splits,test_size=None, train_size = .9)
+def eachCross(clf, train, test, n_splits):
+    sh = StratifiedShuffleSplit(n_splits = n_splits,test_size=None, train_size = .5)
     shuffle = sh.split(getX(train),train['y'])
     ypred = []
     nshuf = 0

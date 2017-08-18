@@ -28,6 +28,7 @@ def trialNumber(trialStrings):
     return np.array(list(map(lambda x: int(x[5:]),trialStrings)))
 
 def XyTfromEpoch(epochs, binDuration=50, window=[0,1000]):
+    assert epochs.applymap(len).min().min() >  window[1]
     cutEpochs = epochs.applymap(lambda x: x[window[0]:window[1]] )
     bins = (window[1]-window[0])//binDuration
     binnedData = cutEpochs.applymap(lambda x: convHist(x, bins=bins) )
