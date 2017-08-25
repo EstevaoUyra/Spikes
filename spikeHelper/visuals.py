@@ -3,8 +3,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from spikeHelper.filters import convHist, kernelSmooth, oneToOneDist
 from spikeHelper.dataOrganization import trialToXyT, getX, normRows, trialNumber
-from sklearn.covariance import EmpiricalCovariance
-from scipy.spatial.distance import mahalanobis, euclidean
+from spikeHelper.similarities import distanceGeneralization, similarityMatrix
 import pandas as pd
 from matplotlib import gridspec
 
@@ -45,38 +44,6 @@ def firingRateEvo(epochs):
     xlims = np.sort(trialNumber(epochs.columns))[[0,-1]]
     sns.jointplot(y='Average firing rate', x='trial', data=avgFiringRate,kind='reg',ratio=10,size=5,xlim=xlims)
 
-def similarityMatrix(X,y,W=None,z=None,method='greek',compare=False, oneToOne=False, normalize=True):
-    empCov = EmpiricalCovariance()
-    if compare:
-        assert W.shape[0] > 1
-        assert z.shape[0] > 1
-        precision = empCov.fit(np.vstack((X,W))).get_precision()
-    else:
-        assert W == None
-        assert z == None
-        W = X; z = y;
-        precision = empCov.fit(X).get_precision()
-
-    if method == 'mah':
-        dist = lambda u,v : mahalanobis(u,v,precision)
-    elif method == 'greek':
-        dist = euclidean
-
-    times1 = np.unique(y)
-    times2 = np.unique(z)
-    template = [ W[z==ti].mean(axis=0) for ti in np.unique(z)]
-    distances = np.full((len(times1),len(times2)),np.nan)
-    if not oneToOne:
-        for i, ti in enumerate(times1):
-            distances[i,:] = np.array([np.array([dist(u,v) for u in X[y==ti]]).mean() for v in template])
-    else:
-        for ti in times1:
-            for tj in times2:
-                distances[ti,tj] = oneToOneDist(X[y==ti], W[z==tj], dist)
-    if normalize:
-        return normRows(1/np.array(distances))
-    else:
-        return 1/np.array(distances)
 
 def motorPlot(epochs, totalTime, bins=50,sigma=50,error = [68,95]):
     endSync = epochs.iloc[:,(epochs.applymap(len).iloc[0]>totalTime).values].applymap(lambda x: x[-totalTime:])
@@ -93,7 +60,7 @@ def motorPlot(epochs, totalTime, bins=50,sigma=50,error = [68,95]):
     sns.tsplot(motor, time= 'Time to leave', value="Firing Rate",unit='trial',condition='unit',ci=error)
     plt.legend().set_visible(False)
 
-def compareSimilarities(data,title,nTrials=50):
+def compareSimilarities(data,title,nTrials=50,normalize=True):
 
     beg = trialToXyT(data[:,:,:nTrials])
     end = trialToXyT(data[:,:,-nTrials:])
@@ -104,32 +71,44 @@ def compareSimilarities(data,title,nTrials=50):
     fig.suptitle(title,fontsize=16)
     cbar_ax = fig.add_axes([.91, .3, .03, .4])
 
-    sim = similarityMatrix(getX(beg), beg['y'],method='mah')
+    sim = distanceGeneralization(getX(beg), beg['y'], beg['trial'], method='mah')
     sns.heatmap(sim,ax=ax1,cbar=0)
     ax1.plot(sim.argmax(axis=1)+.5, np.arange(sim.shape[0])+.5)
+    if normalize:
+        sim = normRows(sim)
     ax1.set_title(str(nTrials) +' first trials mahalanobis')
 
-    sim = similarityMatrix(getX(end), end['y'],method='mah')
+    sim = distanceGeneralization(getX(end), end['y'], end['trial'], method='mah')
     sns.heatmap(sim,ax=ax3,cbar_ax=cbar_ax)
     ax3.plot(sim.argmax(axis=1)+.5, np.arange(sim.shape[0])+.5)
+    if normalize:
+        sim = normRows(sim)
     ax3.set_title(str(nTrials) +' last trials mahalanobis')
 
-    sim = similarityMatrix(getX(allt), allt['y'],method='mah')
+    sim = distanceGeneralization(getX(allt), allt['y'], allt['trial'], method='mah')
+    if normalize:
+        sim = normRows(sim)
     sns.heatmap(sim,ax=ax5,cbar=0)
     ax5.plot(sim.argmax(axis=1)+.5, np.arange(sim.shape[0])+.5)
     ax5.set_title('All trials mahalanobis')
 
-    sim = similarityMatrix(getX(beg), beg['y'],method='greek')
+    sim = distanceGeneralization(getX(beg), beg['y'], beg['trial'], method='greek')
+    if normalize:
+        sim = normRows(sim)
     sns.heatmap(sim,ax=ax2,cbar=0)
     ax2.plot(sim.argmax(axis=1)+.5, np.arange(sim.shape[0])+.5)
     ax2.set_title(str(nTrials) +' first trials euclidean')
 
-    sim = similarityMatrix(getX(end), end['y'],method='greek')
+    sim = distanceGeneralization(getX(end), end['y'], end['trial'], method='greek')
+    if normalize:
+        sim = normRows(sim)
     sns.heatmap(sim,ax=ax4,cbar=0)
     ax4.plot(sim.argmax(axis=1)+.5, np.arange(sim.shape[0])+.5)
     ax4.set_title(str(nTrials) +' last trials euclidean')
 
-    sim = similarityMatrix(getX(allt), allt['y'],method='greek')
+    sim = distanceGeneralization(getX(allt), allt['y'], allt['trial'], method='greek')
+    if normalize:
+        sim = normRows(sim)
     sns.heatmap(sim,ax=ax6,cbar=0)
     ax6.plot(sim.argmax(axis=1)+.5, np.arange(sim.shape[0])+.5)
     ax6.set_title('All trials euclidean')
@@ -209,3 +188,27 @@ def heatAct(data):
     meanAct = normRows(np.array([np.array([data[unit][data['y']==i] for i in range(len(np.unique(data['y'])))]).mean(axis=1) for unit in data.columns[:-4]]))
     order = np.argsort(np.nonzero(meanAct==1)[1])
     sns.heatmap(meanAct[order,:])
+
+def plotPredResults(results,kappa=0):
+    res = results.iloc[:,:8].applymap(lambda x: x.reshape(-1))
+    fig = plt.figure(figsize=(16, 8))
+    plt.subplot(2,2,1)
+
+    if kappa==0:
+        plt.suptitle('Correlation coefficient')
+        lim = [0,1]
+    else:
+        assert kappa==1
+        lim=[0,.5]
+        plt.suptitle('Kappa coefficient')
+    sns.barplot(data = pd.DataFrame(np.vstack(res.iloc[:,0+kappa].values),index=['Rat 7','Rat 8','Rat 9','Rat 10']).transpose())
+    plt.title('Late'); plt.ylim(lim)
+    plt.subplot(2,2,2)
+    sns.barplot(data = pd.DataFrame(np.vstack(res.iloc[:,2+kappa].values),index=['Rat 7','Rat 8','Rat 9','Rat 10']).transpose())
+    plt.title('Early');  plt.ylim(lim)
+    plt.subplot(2,2,4)
+    sns.barplot(data = pd.DataFrame(np.vstack(res.iloc[:,4+kappa].values),index=['Rat 7','Rat 8','Rat 9','Rat 10']).transpose())
+    plt.title('Trained late'); plt.ylim(lim)
+    plt.subplot(2,2,3)
+    sns.barplot(data = pd.DataFrame(np.vstack(res.iloc[:,6+kappa].values),index=['Rat 7','Rat 8','Rat 9','Rat 10']).transpose())
+    plt.title('Trained early');plt.ylim(lim)

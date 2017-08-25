@@ -27,12 +27,14 @@ def getX(data):
 def trialNumber(trialStrings):
     return np.array(list(map(lambda x: int(x[5:]),trialStrings)))
 
-def XyTfromEpoch(epochs, binDuration=50, window=[0,1000]):
-    assert epochs.applymap(len).min().min() >  window[1]
-    cutEpochs = epochs.applymap(lambda x: x[window[0]:window[1]] )
-    bins = (window[1]-window[0])//binDuration
-    binnedData = cutEpochs.applymap(lambda x: convHist(x, bins=bins) )
-    return np.swapaxes(np.array([np.vstack(binnedData.iloc[i]) for i in range(binnedData.shape[0])]),1,2)
+def XyTfromEpoch(epochs, getBins=False):
+    if getBins == False:
+        nBins = epochs.applymap(len).min().min()
+        getBins = [0,nBins]
+        print('Number of bins not defined, getting first',nBins)
+    possibleEpochs = epochs.applymap(len).iloc[0,:].values >= getBins[1]
+    cutEpochs = epochs.iloc[:,possibleEpochs].applymap(lambda x: x[getBins[0]:getBins[1]] )
+    return np.swapaxes(np.array([np.vstack(cutEpochs.iloc[i]) for i in range(cutEpochs.shape[0])]),1,2)
 
 def normRows(k):
     return np.array([k[i,:]/(k.max(axis=1)[i]) for i in range(k.shape[0])])
