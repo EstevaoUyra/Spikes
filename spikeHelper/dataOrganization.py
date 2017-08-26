@@ -27,12 +27,27 @@ def getX(data):
 def trialNumber(trialStrings):
     return np.array(list(map(lambda x: int(x[5:]),trialStrings)))
 
-def XyTfromEpoch(epochs, getBins=False):
+def XyTfromEpoch(epochs, getBins=False, minBins=False, maxBins=False):
+    trialBins = epochs.applymap(len).iloc[0,:].values
+
     if getBins == False:
-        nBins = epochs.applymap(len).min().min()
+        nBins = trialBins.min()
         getBins = [0,nBins]
         print('Number of bins not defined, getting first',nBins)
-    possibleEpochs = epochs.applymap(len).iloc[0,:].values >= getBins[1]
+
+    if minBins == False:
+        minBins = trialBins.min()
+        print('Minimum size not restricted. Using all up from ',minBins)
+    else:
+        print('Minimum size restricted. Using all up from ',minBins)
+
+    if maxBins == False:
+        maxBins = trialBins.max()
+        print('Maximum size not restricted. Using all up to ',maxBins)
+    else:
+        print('Maximum size restricted. Using all up to ',maxBins)
+
+    possibleEpochs = np.logical_and(np.logical_and(trialBins <= maxBins, trialBins >= minBins),trialBins >=getBins[1])
     cutEpochs = epochs.iloc[:,possibleEpochs].applymap(lambda x: x[getBins[0]:getBins[1]] )
     return np.swapaxes(np.array([np.vstack(cutEpochs.iloc[i]) for i in range(cutEpochs.shape[0])]),1,2)
 

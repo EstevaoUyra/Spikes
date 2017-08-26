@@ -5,7 +5,14 @@ from sklearn.metrics import confusion_matrix
 import numpy as np
 from spikeHelper.dataOrganization import normRows
 
-def similarityMatrix(X,y,W=None,z=None,method='greek',compare=False, oneToOne=False, normalize=True):
+def oneToOneDist(Us, Vs, distfunc):
+    eachDist = []
+    for ui in Us:
+        for vi in Vs:
+            eachDist.append(distfunc(ui,vi))
+    return np.array(eachDist).mean()
+
+def similarityMatrix(X,y,W=None,z=None,method='greek',compare=False, oneToOne=False):
     empCov = EmpiricalCovariance()
     if compare:
         assert W.shape[0] > 1
@@ -24,7 +31,7 @@ def similarityMatrix(X,y,W=None,z=None,method='greek',compare=False, oneToOne=Fa
 
     times1 = np.unique(y)
     times2 = np.unique(z)
-    template = [ np.median(W[z==ti],axis=0) for ti in np.unique(z)]
+    template = [ np.mean(W[z==ti],axis=0) for ti in np.unique(z)]
     distances = np.full((len(times1),len(times2)),np.nan)
     if not oneToOne:
         for i, ti in enumerate(times1):
@@ -33,10 +40,8 @@ def similarityMatrix(X,y,W=None,z=None,method='greek',compare=False, oneToOne=Fa
         for ti in times1:
             for tj in times2:
                 distances[ti,tj] = oneToOneDist(X[y==ti], W[z==tj], dist)
-    if normalize:
-        return normRows(1/np.array(distances))
-    else:
-        return 1/np.array(distances)
+
+    return 1/np.array(distances)
 
 class MahalanobisClassifier():
     def __init__(self,warm_start = False):
@@ -105,13 +110,8 @@ class EuclideanClassifier():
     def set_params(self):
         return self
 
-def distanceGeneralization(X,y,ytrial,method='greek'):
+def distanceGeneralization(X,y,ytrial,clf):
     n_classes = len(np.unique(y))
-
-    if method == 'mah':
-        clf = MahalanobisClassifier(warm_start=True)
-    elif method == 'greek':
-        clf = EuclideanClassifier()
 
     clf.fit(X,y)
 

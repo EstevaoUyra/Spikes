@@ -14,14 +14,6 @@ def kernelSmooth(spikeVec, sigma):
 
 def binarize(smoothed, binSize):
     times = np.arange(len(smoothed))
-    nbins= np.array(np.floor(len(smoothed)/binSize),dtype=int)
+    nbins = np.array(np.floor(len(smoothed)/binSize),dtype=int)
     binned = np.histogram(times, bins = nbins, range = (times[0],times[-1]), weights = smoothed[times])[0]*(1000/binSize)
     return binned
-
-
-def oneToOneDist(Us, Vs, distfunc):
-    eachDist = []
-    for ui in Us:
-        for vi in Vs:
-            eachDist.append(distfunc(ui,vi))
-    return np.array(eachDist).mean()
