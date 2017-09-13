@@ -5,7 +5,7 @@ import pickle
 from spikeHelper.filters import convHist
 from spikeHelper.dataOrganization import XyTfromEpoch
 
-def loadSpikeBehav(fileName, binSize):
+def loadSpikeBehav(fileName):
     data = loadmat(fileName)
 
     spikes = data['dados'][0,0][1]
@@ -16,6 +16,26 @@ def loadSpikeBehav(fileName, binSize):
     spikes['trialTime'] = pd.DataFrame(np.transpose([spikes.times[i] - behavior.iloc[spikes.trial[i]-1].onset.as_matrix() for i in range(spikes.shape[0])]))
 
     return spikes, behavior
+
+def normEpoch(spikes,behavior,ratNumber,sigma=20):
+    epochs = np.array([[spikes.trialTime[iunit][spikes.trial[iunit]==itrial] for itrial in range(1,behavior.shape[0]+1)] for iunit in range(spikes.shape[0]) ] )
+    epochs = pd.DataFrame(epochs, index = ['unit'+str(i) for i in range(spikes.shape[0])], columns = ['trial '+str(i) for i in range(1,behavior.shape[0]+1)])
+
+    # Make sure spike times are consistent with trial durations
+    assert ((1000*epochs.apply(lambda x: x.apply(mymax)).max()//1  - np.array([int(1000*behavior.duration[itrial]) for itrial in range(behavior.shape[0])]))>0).sum() == 0
+
+    epochs = filterEpochs(epochs, method='premade', rat=ratNumber)
+
+    for itrial in range(1,behavior.shape[0]+1):
+        binSize = int(np.floor(1000*behavior.duration[itrial-1])/10)
+        func = lambda x: precisionConvBin(x, int(np.floor(1000*behavior.duration[itrial-1])), sigma, binSize)
+        if behavior.duration[itrial-1] > 1
+        epochs['trial '+str(itrial)] = epochs['trial '+str(itrial)].apply(func)
+
+    # Make sure duration is consistent
+    #assert all(np.floor((.5+ behavior.duration)*(1000/binSize))==epochs.applymap(len).iloc[0].values)
+    return epochs
+
 
 def epochData(spikes,behavior,ratNumber,sigma=20,binSize=50):
     epochs = np.array([[spikes.trialTime[iunit][spikes.trial[iunit]==itrial] for itrial in range(1,behavior.shape[0]+1)] for iunit in range(spikes.shape[0]) ] )

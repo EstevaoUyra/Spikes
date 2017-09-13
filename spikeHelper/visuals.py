@@ -3,7 +3,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from spikeHelper.filters import convHist, kernelSmooth
 from spikeHelper.dataOrganization import trialToXyT, getX, normRows, trialNumber
-from spikeHelper.similarities import distanceGeneralization, similarityMatrix
+from spikeHelper.similarities import temporalGeneralization, similarityMatrix
 from spikeHelper.similarities import EuclideanClassifier,MahalanobisClassifier
 import pandas as pd
 from matplotlib import gridspec
@@ -46,23 +46,26 @@ def firingRateEvo(epochs):
     sns.jointplot(y='Average firing rate', x='trial', data=avgFiringRate,kind='reg',ratio=10,size=5,xlim=xlims)
 
 
-def motorPlot(epochs, totalTime, bins=50,sigma=50,error = [68,95]):
-    endSync = epochs.iloc[:,(epochs.applymap(len).iloc[0]>totalTime).values].applymap(lambda x: x[-totalTime:])
+def motorPlot(epochs, totalTime, timelock, binSize=50,sigma=50,error = [68,95]):
+    '''Locks all trials at end or beginning, and calculates the 'ERP' components of each neuron'''
+    if timelock=='end':
+        crop = lambda x: x[-totalTime:]
+    elif timelock=='beg':
+        crop = lambda x: x[:totalTime]
+
+    endSync = epochs.iloc[:,(epochs.applymap(len).iloc[0]>totalTime).values].applymap(crop)
 
     endSync['unit'] = endSync.index
-
     endSync = endSync.melt(id_vars = 'unit',value_name = 'activity',var_name='trial')
-
-    endSync['activity'] = endSync['activity'].apply(lambda x: convHist(x, sigma=sigma, bins=bins))
-    times = -totalTime + totalTime/bins * (np.arange(bins)+1)
+    endSync['activity'] = endSync['activity'].apply(lambda x: convHist(x, sigma=sigma, binSize=binSize))
+    times = binSize * (np.arange(int(totalTime/binSize))+1)
 
     motor = pd.concat([endSync,pd.DataFrame(np.vstack(endSync['activity'].as_matrix()), columns=times) ],axis=1 ).drop('activity',axis=1)
     motor = motor.melt(id_vars=['unit','trial'],var_name = 'Time to leave',value_name = "Firing Rate" )
     sns.tsplot(motor, time= 'Time to leave', value="Firing Rate",unit='trial',condition='unit',ci=error)
     plt.legend().set_visible(False)
 
-def compareSimilarities(data,title,nTrials=50,normalize=True):
-
+def compareSimilarities(data,title,nTrials=50,normalize=True,transform=False):
     beg = trialToXyT(data[:,:,:nTrials])
     end = trialToXyT(data[:,:,-nTrials:])
     allt = trialToXyT(data)
@@ -73,52 +76,58 @@ def compareSimilarities(data,title,nTrials=50,normalize=True):
     cbar_ax = fig.add_axes([.91, .3, .03, .4])
 
     clf = MahalanobisClassifier(warm_start=True)
-    sim = distanceGeneralization(getX(beg), beg['y'], beg['trial'], clf)
+    sim = temporalGeneralization(getX(beg), beg['y'], beg['trial'], clf,transform=transform)
     if normalize:
         sim = normRows(sim)
-    sns.heatmap(sim,ax=ax1,cbar=0)
-    ax1.plot(sim.argmax(axis=1)+.5, np.arange(sim.shape[0])+.5)
+    sns.heatmap(sim,ax=ax1,cbar=0,cmap='inferno')
     ax1.set_title(str(nTrials) +' first trials mahalanobis')
+    ax1.plot(sim.argmax(axis=1)+.5, sim.shape[0] -( np.arange(sim.shape[0])+.5))
+    ax1.invert_yaxis()
 
     clf = MahalanobisClassifier(warm_start=True)
-    sim = distanceGeneralization(getX(end), end['y'], end['trial'], clf)
+    sim = temporalGeneralization(getX(end), end['y'], end['trial'], clf,transform=transform)
     if normalize:
         sim = normRows(sim)
-    sns.heatmap(sim,ax=ax3,cbar_ax=cbar_ax)
-    ax3.plot(sim.argmax(axis=1)+.5, np.arange(sim.shape[0])+.5)
+    sns.heatmap(sim,ax=ax3,cbar_ax=cbar_ax,cmap='inferno')
     ax3.set_title(str(nTrials) +' last trials mahalanobis')
+    ax3.plot(sim.argmax(axis=1)+.5, sim.shape[0] -( np.arange(sim.shape[0])+.5))
+    ax3.invert_yaxis()
 
     clf = MahalanobisClassifier(warm_start=True)
-    sim = distanceGeneralization(getX(allt), allt['y'], allt['trial'], clf)
+    sim = temporalGeneralization(getX(allt), allt['y'], allt['trial'], clf,transform=transform)
     if normalize:
         sim = normRows(sim)
-    sns.heatmap(sim,ax=ax5,cbar=0)
-    ax5.plot(sim.argmax(axis=1)+.5, np.arange(sim.shape[0])+.5)
+    sns.heatmap(sim,ax=ax5,cbar=0,cmap='inferno')
     ax5.set_title('All trials mahalanobis')
+    ax5.plot(sim.argmax(axis=1)+.5, sim.shape[0] -( np.arange(sim.shape[0])+.5))
+    ax5.invert_yaxis()
 
     clf = EuclideanClassifier()
-    sim = distanceGeneralization(getX(beg), beg['y'], beg['trial'], clf)
+    sim = temporalGeneralization(getX(beg), beg['y'], beg['trial'], clf,transform=transform)
     if normalize:
         sim = normRows(sim)
-    sns.heatmap(sim,ax=ax2,cbar=0)
-    ax2.plot(sim.argmax(axis=1)+.5, np.arange(sim.shape[0])+.5)
+    sns.heatmap(sim,ax=ax2,cbar=0,cmap='inferno')
     ax2.set_title(str(nTrials) +' first trials euclidean')
+    ax2.plot(sim.argmax(axis=1)+.5, sim.shape[0] -( np.arange(sim.shape[0])+.5))
+    ax2.invert_yaxis()
 
     clf = EuclideanClassifier()
-    sim = distanceGeneralization(getX(end), end['y'], end['trial'], clf)
+    sim = temporalGeneralization(getX(end), end['y'], end['trial'], clf,transform=transform)
     if normalize:
         sim = normRows(sim)
-    sns.heatmap(sim,ax=ax4,cbar=0)
-    ax4.plot(sim.argmax(axis=1)+.5, np.arange(sim.shape[0])+.5)
+    sns.heatmap(sim,ax=ax4,cbar=0,cmap='inferno')
     ax4.set_title(str(nTrials) +' last trials euclidean')
+    ax4.plot(sim.argmax(axis=1)+.5, sim.shape[0] -( np.arange(sim.shape[0])+.5))
+    ax4.invert_yaxis()
 
     clf = EuclideanClassifier()
-    sim = distanceGeneralization(getX(allt), allt['y'], allt['trial'], clf)
+    sim = temporalGeneralization(getX(allt), allt['y'], allt['trial'], clf,transform=transform)
     if normalize:
         sim = normRows(sim)
-    sns.heatmap(sim,ax=ax6,cbar=0)
-    ax6.plot(sim.argmax(axis=1)+.5, np.arange(sim.shape[0])+.5)
+    sns.heatmap(sim,ax=ax6,cbar=0,cmap='inferno')
     ax6.set_title('All trials euclidean')
+    ax6.plot(sim.argmax(axis=1)+.5, sim.shape[0] -( np.arange(sim.shape[0])+.5))
+    ax6.invert_yaxis()
 
 def distSimilarities(data,title,nTrials=50,normalize=True):
 
@@ -136,53 +145,53 @@ def distSimilarities(data,title,nTrials=50,normalize=True):
     if normalize:
         sim = normRows(sim)
     sns.heatmap(sim,ax=ax1,cbar=0)
-    ax1.plot(sim.argmax(axis=1)+.5, np.arange(sim.shape[0])+.5)
     ax1.set_title(str(nTrials) +' first trials mahalanobis')
-
+    ax1.plot(sim.argmax(axis=1)+.5, np.arange(sim.shape[0])+.5)
+    ax1.invert_yaxis()
 
     sim = similarityMatrix(getX(end), end['y'],  method='mah')
     if normalize:
         sim = normRows(sim)
     sns.heatmap(sim,ax=ax3,cbar_ax=cbar_ax)
-    ax3.plot(sim.argmax(axis=1)+.5, np.arange(sim.shape[0])+.5)
     ax3.set_title(str(nTrials) +' last trials mahalanobis')
-
+    ax3.plot(sim.argmax(axis=1)+.5, np.arange(sim.shape[0])+.5)
+    ax3.invert_yaxis()
 
     sim = similarityMatrix(getX(allt), allt['y'],  method='mah')
     if normalize:
         sim = normRows(sim)
     sns.heatmap(sim,ax=ax5,cbar=0)
-    ax5.plot(sim.argmax(axis=1)+.5, np.arange(sim.shape[0])+.5)
     ax5.set_title('All trials mahalanobis')
-
+    ax5.plot(sim.argmax(axis=1)+.5, np.arange(sim.shape[0])+.5)
+    ax5.invert_yaxis()
 
     sim = similarityMatrix(getX(beg), beg['y'],  method='greek')
     if normalize:
         sim = normRows(sim)
     sns.heatmap(sim,ax=ax2,cbar=0)
-    ax2.plot(sim.argmax(axis=1)+.5, np.arange(sim.shape[0])+.5)
     ax2.set_title(str(nTrials) +' first trials euclidean')
-
+    ax2.plot(sim.argmax(axis=1)+.5, np.arange(sim.shape[0])+.5)
+    ax2.invert_yaxis()
 
     sim = similarityMatrix(getX(end), end['y'],  method='greek')
     if normalize:
         sim = normRows(sim)
     sns.heatmap(sim,ax=ax4,cbar=0)
-    ax4.plot(sim.argmax(axis=1)+.5, np.arange(sim.shape[0])+.5)
     ax4.set_title(str(nTrials) +' last trials euclidean')
-
+    ax4.plot(sim.argmax(axis=1)+.5, np.arange(sim.shape[0])+.5)
+    ax4.invert_yaxis()
 
     sim = similarityMatrix(getX(allt), allt['y'],  method='greek')
     if normalize:
         sim = normRows(sim)
     sns.heatmap(sim,ax=ax6,cbar=0)
-    ax6.plot(sim.argmax(axis=1)+.5, np.arange(sim.shape[0])+.5)
     ax6.set_title('All trials euclidean')
-
+    ax6.plot(sim.argmax(axis=1)+.5, np.arange(sim.shape[0])+.5)
+    ax6.invert_yaxis()
 
 def crossSimilarities(shorter, longer, title, normalize=True,oneToOne=False):
 
-    simFunc = lambda X,y,W,z,m: similarityMatrix(X,y,W=None,z=None,method=m,compare=True, oneToOne=oneToOne)
+    simFunc = lambda X,y,W,z,m: similarityMatrix(X,y,W,z,method=m,compare=True, oneToOne=oneToOne)
 
     shorter = trialToXyT(shorter)
     longer = trialToXyT(longer)
@@ -208,7 +217,7 @@ def crossSimilarities(shorter, longer, title, normalize=True,oneToOne=False):
     ax1.set_title('Long as template')
     ax1.set_xticks([])
 
-    sim = simFunc(getX(longer), longer['y'],m='mah')
+    sim = simFunc(getX(longer), longer['y'],getX(longer), longer['y'],m='mah')
     if normalize:
         sim = normRows(sim)
     sns.heatmap(sim,ax=ax3,cbar_ax=cbar_ax)
@@ -223,7 +232,7 @@ def crossSimilarities(shorter, longer, title, normalize=True,oneToOne=False):
     ax2.set_title('Short as template')
     ax2.set_yticks([])
 
-    sim = simFunc(getX(shorter), shorter['y'],m='mah')
+    sim = simFunc(getX(shorter), shorter['y'],getX(shorter), shorter['y'],m='mah')
     if normalize:
         sim = normRows(sim)
     sns.heatmap(sim,ax=ax4,cbar=0)
@@ -245,7 +254,7 @@ def crossSimilarities(shorter, longer, title, normalize=True,oneToOne=False):
     ax5.set_title('Long as template')
     ax5.set_xticks([]); ax5.set_yticks([])
 
-    sim = simFunc(getX(longer), longer['y'],m='greek')
+    sim = simFunc(getX(longer), longer['y'],getX(longer), longer['y'],m='greek')
     if normalize:
         sim = normRows(sim)
     sns.heatmap(sim,ax=ax7,cbar=0)
@@ -261,7 +270,7 @@ def crossSimilarities(shorter, longer, title, normalize=True,oneToOne=False):
     ax6.set_title('Short as template')
     ax6.set_yticks([])
 
-    sim = simFunc(getX(shorter), shorter['y'],m='greek')
+    sim = simFunc(getX(shorter), shorter['y'],getX(shorter), shorter['y'],m='greek')
     if normalize:
         sim = normRows(sim)
     sns.heatmap(sim,ax=ax8,cbar=0)
@@ -269,10 +278,10 @@ def crossSimilarities(shorter, longer, title, normalize=True,oneToOne=False):
     ax8.set_title('Short with itself')
     ax8.set_xticks([]);ax8.set_yticks([])
 
-def heatAct(data):
+def heatAct(data,ax):
     meanAct = normRows(np.array([np.array([data[unit][data['y']==i] for i in range(len(np.unique(data['y'])))]).mean(axis=1) for unit in data.columns[:-4]]))
     order = np.argsort(np.nonzero(meanAct==1)[1])
-    sns.heatmap(meanAct[order,:])
+    sns.heatmap(meanAct[order,:],ax = ax)
 
 def plotPredResults(results,kappa=0):
     res = results.iloc[:,:8].applymap(lambda x: x.reshape(-1))

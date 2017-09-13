@@ -12,7 +12,7 @@ def kernelSmooth(spikeVec, sigma):
     smoothed = np.convolve(spikeVec, normKernel, 'same')
     return smoothed
 
-def binarize(smoothed, binSize):
+def binarize(smoothed, binSize,norm=False):
     times = np.arange(len(smoothed))
     nbins = np.array(np.floor(len(smoothed)/binSize),dtype=int)
     binned = np.histogram(times, bins = nbins, range = (times[0],times[-1]), weights = smoothed[times])[0]*(1000/binSize)
