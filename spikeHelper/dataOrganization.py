@@ -64,6 +64,13 @@ def XyTfromEpoch(epochs, getBins=False, minBins=False, maxBins=False,verbose=Fal
         return goodEpochs, trials
     return goodEpochs
 
+def padNans(vector, finalLen):
+    ''' Returns a row vector with nans appended to its final part, having a total size equal to finalLen'''
+    howMuchLacks = finalLen - len(vector)
+    newvector = np.hstack( ( vector.reshape(1,-1), np.full( (1,howMuchLacks),np.nan) ) )
+    return newvector
+
+
 def normRows(k):
     return np.array([k[i,:]/(k.max(axis=1)[i]) for i in range(k.shape[0])])
 
