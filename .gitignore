@@ -28,6 +28,8 @@
 *.mat
 *.pickle
 *.csv
+*.h5
+*.hdf5
 
 # OS generated files #
 ######################

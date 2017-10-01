@@ -59,8 +59,6 @@ class MahalanobisClassifier():
         if self.warm:
             self.warmed = True
 
-        assert np.max(y) == (len(np.unique(y))-1)
-
     def _predictOne(self, x):
         return np.argmin(self._transformOne(x))
 
@@ -113,7 +111,7 @@ class EuclideanClassifier():
     def set_params(self):
         return self
 
-def temporalGeneralization(X,y,ytrial,clf,returnCubic=False,transform=False):
+def temporalGeneralization(X,y,ytrial,clf,returnCubic=False,returnDecisionFunc=False):
     n_classes = len(np.unique(y))
 
     if not isinstance(clf,SVC):
@@ -122,7 +120,7 @@ def temporalGeneralization(X,y,ytrial,clf,returnCubic=False,transform=False):
     times = np.unique(y)
     trials = np.unique(ytrial)
 
-    if transform:
+    if returnDecisionFunc:
         confusionPerTrial = np.full((n_classes,n_classes,trials.shape[0]),np.nan)
         for i,testTrial in enumerate(trials):
             clfi = clone(clf)
@@ -165,7 +163,7 @@ def crossGeneralization(epochsTrain,epochsTest,rat):
     ntrain, ntest = len(np.unique(ytrain)), len(np.unique(ytest))
     tempGen = np.full((ntrain,ntest),np.nan)
     for real_y in np.unique(ytest):
-        tempGen[:,real_y] = clf.decision_function(Xtest[ytest==real_y]).mean(axis=0)
+        tempGen[:,real_y-min(ytest)] = clf.decision_function(Xtest[ytest==real_y]).mean(axis=0)
 
     return confusionPerTrial,tempGen
 

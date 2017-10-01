@@ -7,6 +7,83 @@ from spikeHelper.similarities import temporalGeneralization, similarityMatrix
 from spikeHelper.similarities import EuclideanClassifier,MahalanobisClassifier
 import pandas as pd
 from matplotlib import gridspec
+import ipywidgets as wdg
+from ipywidgets import interact
+from IPython.display import display
+
+def interactWithActivity(cubicNeuronTimeTrial,realTime = False):
+    '''Receives as input a cubicNeuronTimeTrial matrix, and lets the user visualize the activity while choosing input ranges'''
+
+    neuronSelect = wdg.ToggleButtons(options=['Plot', 'Marginalize', 'Select'],tooltips=['Show in chart', 'Take mean of values in range', 'Get specific value'])
+    timeSelect = wdg.ToggleButtons(options=['Plot', 'Marginalize', 'Select'],tooltips=['Show in chart', 'Take mean of values in range', 'Get specific value'])
+    trialSelect = wdg.ToggleButtons(options=['Plot', 'Marginalize', 'Select'],tooltips=['Show in chart', 'Take mean of values in range', 'Get specific value'])
+
+    @interact(neurons=neuronSelect,times=timeSelect, trials=trialSelect)
+    def makeSliders(neurons,times,trials):
+        def chooseSlider(selected,axis):
+            if selected == 'Select':
+                return wdg.IntSlider(min = 0, max = cubicNeuronTimeTrial.shape[axis]-1,layout=wdg.Layout(width='50%', height='30px'))
+            else:
+                return wdg.IntRangeSlider(min = 0, max = cubicNeuronTimeTrial.shape[axis],layout=wdg.Layout(width='50%', height='30px'))
+
+        neuronSlider = chooseSlider(neurons,ax('neuron'))
+        timeSlider = chooseSlider(times,ax('time'))
+        trialSlider = chooseSlider(trials,ax('trial'))
+
+        def plotMeanActivity(neuron,time,trial):
+            plt.figure(figsize=(8,6))
+            if type(time) is not int:
+                time = np.arange(*time)
+            if type(trial) is not int:
+                trial= np.arange(*trial)
+            if type(neuron) is not int:
+                neuron = np.arange(*neuron)
+            data = multipleSliceMarg(cubicNeuronTimeTrial,[neuron,neurons],[time,times],[trial,trials])
+            print(data.shape)
+            plotMarg(data)
+
+        if realTime:
+            wdg.interact(plotMeanActivity, neuron = neuronSlider,time=timeSlider,trial=trialSlider);
+        else:
+            wdg.interact_manual(plotMeanActivity, neuron = neuronSlider,time=timeSlider,trial=trialSlider);
+
+def plotMarg(data):
+    nonFlat = np.nonzero([x!=1 for x in data.shape])[0]
+    labels = ['Neuron number', 'Time bin', 'Trial number']
+    if len(nonFlat)==1:
+        plt.plot(data.squeeze())
+        plt.xlabel(labels[nonFlat[0]])
+        plt.ylabel('Mean firing rate')
+
+    elif len(nonFlat)==2:
+        plt.imshow(data.squeeze(),aspect='auto')
+        plt.xlabel(labels[nonFlat[1]])
+        plt.ylabel(labels[nonFlat[0]])
+    else:
+        raise ValueError('At least one dimension must be squeezed')
+
+def ax(field):
+    if field=='neuron':
+        return 0
+    elif field=='time':
+        return 1
+    elif field=='trial':
+        return 2
+
+def multipleSliceMarg(matrix, neurons, times, trials):
+    sliced = matrix.copy()
+    sliced = margOrTake(sliced,ax('neuron'),neurons[0],neurons[1])
+    sliced = margOrTake(sliced,ax('time'),times[0],times[1])
+    sliced = margOrTake(sliced,ax('trial'),trials[0],trials[1])
+    return sliced
+
+def margOrTake(matrix,axis,indexes,MorT):
+    if MorT == 'Marginalize':
+        return matrix.take(indexes,axis).mean(axis=axis,keepdims=True)
+    elif MorT=='Select':
+        return matrix.take([indexes],axis)
+    elif MorT=='Plot':
+        return matrix.take(indexes,axis)
 
 def trialNeuronPlot(epochs, neuron, trial, xmax = None):
     spikeVec = epochs.iloc[neuron,trial-1]*1000
