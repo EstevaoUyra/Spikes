@@ -134,20 +134,20 @@ class Rat():
     def _loadFile(self):
         f = h5py.File("spikeData.hdf5", "r+")
         dsetName = 'bin'+str(self._binSize)+'_sigma'+str(self._sigma)
-        
+
         if self.label not in f:
             print(self.label + ' not contained in database. Creating group')
             f.create_group(self.label)
-            f[self.label].create_group('epochData')
+            #f[self.label].create_group('epochData')
 
-        if dsetName not in f[self.label]['epochData']:
+        if dsetName not in f[self.label]:
             print(dsetName + ' not contained in database. Creating dataset.')
             self._create(dsetName,f)
 
-        for atribute in list(f[self.label]['epochData'][dsetName].attrs):
-            self._trialSpecs[atribute] = f[self.label]['epochData'][dsetName].attrs[atribute]
+        for atribute in list(f[self.label][dsetName].attrs):
+            self._trialSpecs[atribute] = f[self.label][dsetName].attrs[atribute]
 
-        neuronTimeTrial = f[self.label]['epochData'][dsetName][:,:,:]
+        neuronTimeTrial = f[self.label][dsetName][:,:,:]
         f.close()
         return neuronTimeTrial
 
@@ -160,13 +160,13 @@ class Rat():
         cubicData, trialN = XyTfromEpoch(epochs,returnTrialN = True)
         iti = np.hstack((0,behavior.onset[1:].values - behavior.offset.iloc[:-1].values ) )
 
-        f[self.label]['epochData'].create_dataset(dsetName, data = cubicData,shuffle=True, compression='lzf')
-        f[self.label]['epochData'][dsetName].attrs.create('Trial number', trialN)
-        f[self.label]['epochData'][dsetName].attrs.create('Trial length', trialLen)
-        f[self.label]['epochData'][dsetName].attrs.create('Trial duration', behavior.duration.values*1000)
-        f[self.label]['epochData'][dsetName].attrs.create('Trial start', behavior.onset.values*1000)
-        f[self.label]['epochData'][dsetName].attrs.create('Trial end', behavior.offset.values*1000)
-        f[self.label]['epochData'][dsetName].attrs.create('Intertrial interval', iti*1000)
+        f[self.label].create_dataset(dsetName, data = cubicData,shuffle=True, compression='lzf')
+        f[self.label][dsetName].attrs.create('Trial number', trialN)
+        f[self.label][dsetName].attrs.create('Trial length', trialLen)
+        f[self.label][dsetName].attrs.create('Trial duration', behavior.duration.values*1000)
+        f[self.label][dsetName].attrs.create('Trial start', behavior.onset.values*1000)
+        f[self.label][dsetName].attrs.create('Trial end', behavior.offset.values*1000)
+        f[self.label][dsetName].attrs.create('Intertrial interval', iti*1000)
 
     def _trialHas(self,property, value):
         if value is None:
